@@ -35,6 +35,11 @@ function writeDB(data) {
 
 // --- API ENDPOINTS ---
 
+// 0. Silence chrome devtools debugging requests
+app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
+  res.status(200).json({});
+});
+
 // 1. Get initial configuration (categories, societies, current provider database status)
 app.get('/api/providers', (req, res) => {
   const db = readDB();

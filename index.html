@@ -35,7 +35,7 @@
       </nav>
 
       <!-- Society Selector -->
-      <div class="society-selector-wrapper">
+      <div class="society-selector-wrapper hidden">
         <i data-lucide="map-pin" class="pin-icon"></i>
         <select id="header-society-select" class="society-select-dropdown">
           <option value="all">All Societies</option>
@@ -204,7 +204,7 @@
           </div>
 
           <!-- Society Location Filter -->
-          <div class="filter-group">
+          <div class="filter-group hidden">
             <label class="filter-label">Society Location</label>
             <select id="filter-society" class="filter-select">
               <option value="all">All Societies</option>
@@ -273,7 +273,7 @@
             </div>
             
             <!-- Map Side Panel -->
-            <div class="map-container">
+            <div class="map-container hidden">
               <div class="map-placeholder">
                 <div class="map-glow"></div>
                 <div class="map-inner">
@@ -366,25 +366,24 @@
               
               <!-- 1. Select Services (Checklist or Custom) -->
               <div class="booking-step-group">
-                <label class="step-section-title">1. Booking Method</label>
-                <div class="booking-pricing-mode-toggle mb-4">
+                <div class="booking-pricing-mode-toggle mb-4 hidden">
                   <label class="radio-label">
-                    <input type="radio" name="booking-mode" value="standard" checked> <span>Standard Rates</span>
+                    <input type="radio" name="booking-mode" value="standard"> <span>Standard Rates</span>
                   </label>
                   <label class="radio-label">
-                    <input type="radio" name="booking-mode" value="custom"> <span>Agreed Phone Price</span>
+                    <input type="radio" name="booking-mode" value="custom" checked> <span>Agreed Phone Price</span>
                   </label>
                 </div>
 
-                <div id="booking-standard-pricing-panel">
+                <div id="booking-standard-pricing-panel" class="hidden">
                   <label class="step-section-title">Select Services Needed</label>
                   <div class="service-checklist-group" id="booking-services-list">
                     <!-- Populate pricing list checkboxes -->
                   </div>
                 </div>
 
-                <div id="booking-custom-pricing-panel" class="hidden mt-4">
-                  <label for="booking-custom-rate" class="step-section-title">Enter Agreed Price ($)</label>
+                <div id="booking-custom-pricing-panel" class="mt-4">
+                  <label for="booking-custom-rate" class="step-section-title">1. Enter Agreed Price ($)</label>
                   <input type="number" id="booking-custom-rate" class="form-input-small mt-2" placeholder="Amount discussed on phone" min="1">
                   <span class="call-hint-text mt-2">Process payments on Servify for warranty protection.</span>
                 </div>
@@ -499,7 +498,7 @@
         <div class="provider-banner-heading">
           <div>
             <span class="pro-tag">Partner Portal</span>
-            <h1 class="view-title">Provider Dashboard: <span class="gradient-text">Alex Mercer</span></h1>
+            <h1 class="view-title">Provider Dashboard: <span class="gradient-text" id="provider-dashboard-title-name">Alex Mercer</span></h1>
           </div>
           <div class="status-indicator">
             <span class="pulse-indicator"></span> Live Accepting Jobs

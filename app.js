@@ -39,6 +39,7 @@ class ServifyApp {
     this.renderSocietyOptions();
     this.checkQRSociety();
     this.renderFeaturedProviders();
+    this.renderHomepageServices();
     this.renderCategoryFilterOptions();
     this.updateExploreResults();
     this.renderUserBookings();
@@ -289,6 +290,67 @@ class ServifyApp {
     `).join('');
   }
 
+  renderHomepageServices() {
+    const list = document.getElementById('homepage-services-list');
+    if (!list) return;
+
+    // Collect all unique services from all providers
+    const servicesMap = new Map();
+
+    this.state.providers.forEach(pro => {
+      pro.pricingList.forEach(srv => {
+        const key = srv.name.trim();
+        if (servicesMap.has(key)) {
+          const existing = servicesMap.get(key);
+          if (srv.price < existing.minPrice) {
+            existing.minPrice = srv.price;
+          }
+        } else {
+          servicesMap.set(key, {
+            name: srv.name,
+            category: pro.category,
+            minPrice: srv.price,
+            icon: this.getCategoryIcon(pro.category)
+          });
+        }
+      });
+    });
+
+    const services = Array.from(servicesMap.values());
+
+    if (services.length === 0) {
+      list.innerHTML = `<p class="text-muted">No specialized services available.</p>`;
+      return;
+    }
+
+    list.innerHTML = services.map(srv => `
+      <div class="service-home-card" onclick="app.quickSearchService('${srv.name}')">
+        <div class="service-home-icon-row">
+          <span class="service-home-icon">${srv.icon}</span>
+          <span class="service-home-badge">${srv.category}</span>
+        </div>
+        <h3 class="service-home-title">${srv.name}</h3>
+        <div class="service-home-footer">
+          <span class="service-home-lbl">Starting from</span>
+          <strong class="service-home-price">$${srv.minPrice}</strong>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  quickSearchService(serviceName) {
+    this.state.activeSearchQuery = serviceName;
+    this.state.activeFilterCategory = 'all';
+
+    const exploreInput = document.getElementById('explore-search-input');
+    if (exploreInput) exploreInput.value = serviceName;
+
+    const filterCat = document.getElementById('filter-category');
+    if (filterCat) filterCat.value = 'all';
+
+    this.navigate('explore-view');
+  }
+
   renderFeaturedProviders() {
     const container = document.getElementById('featured-providers');
     if (!container) return;
@@ -484,13 +546,14 @@ class ServifyApp {
         return false;
       }
 
-      // 5. Search query filter (matches name, tagline, skills)
+      // 5. Search query filter (matches name, tagline, skills, or offered services)
       if (this.state.activeSearchQuery) {
         const query = this.state.activeSearchQuery.toLowerCase();
         const matchesName = pro.name.toLowerCase().includes(query);
         const matchesTagline = pro.tagline.toLowerCase().includes(query);
         const matchesSkills = pro.skills.some(skill => skill.toLowerCase().includes(query));
-        if (!matchesName && !matchesTagline && !matchesSkills) return false;
+        const matchesServices = pro.pricingList && pro.pricingList.some(srv => srv.name.toLowerCase().includes(query));
+        if (!matchesName && !matchesTagline && !matchesSkills && !matchesServices) return false;
       }
 
       return true;
@@ -685,10 +748,10 @@ class ServifyApp {
     const customPricingPanel = document.getElementById('booking-custom-pricing-panel');
     
     // Set initial toggle state
-    const standardRadio = document.querySelector('input[name="booking-mode"][value="standard"]');
-    if (standardRadio) standardRadio.checked = true;
-    standardPricingPanel.classList.remove('hidden');
-    customPricingPanel.classList.add('hidden');
+    const customRadio = document.querySelector('input[name="booking-mode"][value="custom"]');
+    if (customRadio) customRadio.checked = true;
+    if (standardPricingPanel) standardPricingPanel.classList.add('hidden');
+    if (customPricingPanel) customPricingPanel.classList.remove('hidden');
 
     modeRadios.forEach(radio => {
       radio.addEventListener('change', (e) => {
@@ -1138,6 +1201,26 @@ class ServifyApp {
     
     if (!requestsContainer) return;
 
+    const alexMercer = this.state.providers.find(p => p.id === 'p1');
+    if (alexMercer) {
+      // Update portal header name dynamically
+      const titleName = document.getElementById('provider-dashboard-title-name');
+      if (titleName) {
+        titleName.textContent = alexMercer.name || 'Alex Mercer';
+      }
+
+      // Pre-populate update profile form inputs
+      const nameInput = document.getElementById('edit-pro-name');
+      const phoneInput = document.getElementById('edit-pro-phone');
+      const taglineInput = document.getElementById('edit-pro-tagline');
+      const bioInput = document.getElementById('edit-pro-bio');
+
+      if (nameInput && document.activeElement !== nameInput) nameInput.value = alexMercer.name || '';
+      if (phoneInput && document.activeElement !== phoneInput) phoneInput.value = alexMercer.phone || '';
+      if (taglineInput && document.activeElement !== taglineInput) taglineInput.value = alexMercer.tagline || '';
+      if (bioInput && document.activeElement !== bioInput) bioInput.value = alexMercer.bio || '';
+    }
+
     // Filter requests matching the default logged-in provider (Alex Mercer, id: 'p1')
     const alexBookings = this.state.bookings.filter(b => b.providerId === 'p1');
     const pendingRequests = alexBookings.filter(b => b.status === 'pending');
@@ -1242,7 +1325,6 @@ class ServifyApp {
     }
 
     // 3. Render Custom Rates Editor (for provider id 'p1' Alex Mercer)
-    const alexMercer = this.state.providers.find(p => p.id === 'p1');
     if (alexMercer) {
       ratesContainer.innerHTML = alexMercer.pricingList.map((srv, index) => `
         <div class="rate-edit-row">
@@ -1358,6 +1440,83 @@ class ServifyApp {
         }
       }
     });
+
+    // Bind profile update form submission
+    const profileForm = document.getElementById('provider-profile-form');
+    if (profileForm) {
+      profileForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const nameVal = document.getElementById('edit-pro-name').value.trim();
+        const phoneVal = document.getElementById('edit-pro-phone').value.trim();
+        const taglineVal = document.getElementById('edit-pro-tagline').value.trim();
+        const bioVal = document.getElementById('edit-pro-bio').value.trim();
+
+        if (!nameVal || !phoneVal || !taglineVal || !bioVal) {
+          this.showToast('Please fill in all profile fields.');
+          return;
+        }
+
+        // 1. Update local state
+        const alex = this.state.providers.find(p => p.id === 'p1');
+        if (alex) {
+          alex.name = nameVal;
+          alex.phone = phoneVal;
+          alex.tagline = taglineVal;
+          alex.bio = bioVal;
+
+          // Sync with customer bookings locally
+          this.state.bookings.forEach(b => {
+            if (b.providerId === 'p1') {
+              b.providerName = nameVal;
+            }
+          });
+
+          this.saveState();
+        }
+
+        // 2. Sync changes back to server database
+        try {
+          const response = await fetch(`${API_BASE_URL}/providers/p1/profile`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: nameVal,
+              phone: phoneVal,
+              tagline: taglineVal,
+              bio: bioVal
+            })
+          });
+
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Server error saving profile.');
+          }
+
+          const resData = await response.json();
+          if (resData.success && resData.provider) {
+            // Update local memory state with details returned from backend
+            const updatedPro = resData.provider;
+            const idx = this.state.providers.findIndex(p => p.id === 'p1');
+            if (idx !== -1) {
+              this.state.providers[idx] = updatedPro;
+            }
+            this.saveState();
+          }
+        } catch (err) {
+          console.warn('API connection error. Profile updated locally offline:', err);
+        }
+
+        // 3. Show confirmation feedback and refresh views
+        this.showToast('Profile info updated successfully!');
+        
+        // Re-render dashboards and search results to propagate names/taglines
+        this.renderProviderDashboard();
+        this.renderFeaturedProviders();
+        this.updateExploreResults();
+        this.renderUserBookings();
+      });
+    }
   }
 }
 

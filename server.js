@@ -201,6 +201,56 @@ app.post('/api/bookings/:id/complete', (req, res) => {
   res.json(booking);
 });
 
+// 6.5 Submit booking review (Customer action)
+app.post('/api/bookings/:id/review', (req, res) => {
+  const { rating, text, author } = req.body;
+  if (!rating) {
+    return res.status(400).json({ error: 'Rating stars value is required.' });
+  }
+
+  const db = readDB();
+  const booking = db.bookings.find(b => b.id === req.params.id);
+  if (!booking) {
+    return res.status(404).json({ error: 'Booking not found.' });
+  }
+
+  if (booking.status !== 'completed') {
+    return res.status(400).json({ error: 'Can only review completed bookings.' });
+  }
+
+  if (booking.isReviewed) {
+    return res.status(400).json({ error: 'Booking has already been reviewed.' });
+  }
+
+  // 1. Update booking state
+  booking.isReviewed = true;
+  booking.review = {
+    rating: parseInt(rating),
+    text: text || '',
+    date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  };
+
+  // 2. Find and update provider details
+  const provider = db.providers.find(p => p.id === booking.providerId);
+  if (provider) {
+    const newReview = {
+      author: author || 'Abhishek K.',
+      date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+      rating: parseInt(rating),
+      text: text || ''
+    };
+    provider.reviews = provider.reviews || [];
+    provider.reviews.push(newReview);
+    provider.reviewsCount = provider.reviews.length;
+    
+    const totalStars = provider.reviews.reduce((sum, r) => sum + r.rating, 0);
+    provider.rating = parseFloat((totalStars / provider.reviewsCount).toFixed(1));
+  }
+
+  writeDB(db);
+  res.json({ success: true, booking, provider });
+});
+
 // 7. Chat messenger endpoints (Stores message & returns simulated auto-replies)
 app.post('/api/bookings/:id/chat', (req, res) => {
   const { sender, text } = req.body;

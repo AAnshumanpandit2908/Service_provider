@@ -32,6 +32,7 @@ class ServifyApp {
     this.bindSearchAndFilters();
     this.bindChatEvents();
     this.bindProviderDashboardEvents();
+    this.bindReviewEvents();
     this.initTheme();
 
     // 4. Perform Initial Renders
@@ -960,6 +961,13 @@ class ServifyApp {
                 ${b.status === 'pending' ? `
                   <button class="btn btn-secondary btn-small text-red" onclick="app.cancelBooking('${b.id}')" style="color: var(--danger); border-color: var(--danger-light);">Cancel</button>
                 ` : ''}
+                ${b.status === 'completed' ? (
+                  b.isReviewed ? `
+                    <span class="badge" style="background-color: var(--primary-light); color: var(--primary); text-transform: none; font-size: 0.8rem; padding: 0.4rem 0.65rem; border-radius: 0.35rem; display: inline-flex; align-items: center; gap: 0.25rem;"><i data-lucide="star" style="width:0.85rem; height:0.85rem; fill:var(--primary); display:inline;"></i> Rated</span>
+                  ` : `
+                    <button class="btn btn-primary btn-small" onclick="app.openReviewModal('${b.id}')"><i data-lucide="star"></i> Rate Professional</button>
+                  `
+                ) : ''}
               </div>
             </div>
           </div>
@@ -992,6 +1000,137 @@ class ServifyApp {
     this.showToast('Booking cancelled.');
     this.renderUserBookings();
     this.renderProviderDashboard();
+  }
+
+  // --- RATING & REVIEW SYSTEM ---
+  openReviewModal(bookingId) {
+    const booking = this.state.bookings.find(b => b.id === bookingId);
+    if (!booking) return;
+
+    this.state.activeReviewBookingId = bookingId;
+    this.state.activeReviewStars = 5; // Default to 5 stars
+
+    // Set provider name in modal
+    const nameEl = document.getElementById('review-pro-name');
+    if (nameEl) nameEl.textContent = booking.providerName;
+
+    // Reset stars state visually (all active)
+    document.querySelectorAll('.star-rating-selector .star-btn').forEach(btn => {
+      btn.classList.add('active');
+    });
+
+    // Clear textarea
+    const textInput = document.getElementById('review-text-input');
+    if (textInput) textInput.value = '';
+
+    // Show modal
+    const modal = document.getElementById('review-modal');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  closeReviewModal() {
+    const modal = document.getElementById('review-modal');
+    if (modal) modal.classList.add('hidden');
+    this.state.activeReviewBookingId = null;
+  }
+
+  bindReviewEvents() {
+    // Star clicking handlers
+    const stars = document.querySelectorAll('.star-rating-selector .star-btn');
+    stars.forEach(star => {
+      star.addEventListener('click', (e) => {
+        const ratingVal = parseInt(star.getAttribute('data-value'));
+        this.state.activeReviewStars = ratingVal;
+        
+        // Toggle active class on stars
+        stars.forEach(s => {
+          const val = parseInt(s.getAttribute('data-value'));
+          if (val <= ratingVal) {
+            s.classList.add('active');
+          } else {
+            s.classList.remove('active');
+          }
+        });
+      });
+    });
+
+    // Submit Review button handler
+    const submitBtn = document.getElementById('submit-review-btn');
+    if (submitBtn) {
+      submitBtn.addEventListener('click', async () => {
+        const bookingId = this.state.activeReviewBookingId;
+        if (!bookingId) return;
+
+        const booking = this.state.bookings.find(b => b.id === bookingId);
+        if (!booking) return;
+
+        const ratingVal = this.state.activeReviewStars;
+        const textVal = document.getElementById('review-text-input')?.value.trim() || '';
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/bookings/${bookingId}/review`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              rating: ratingVal,
+              text: textVal,
+              author: 'Abhishek K.' // Logged in user name
+            })
+          });
+
+          if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to submit review');
+          }
+
+          const resData = await response.json();
+          if (resData.success) {
+            // Update booking details
+            booking.isReviewed = true;
+            booking.review = resData.booking.review;
+
+            // Update corresponding provider details in state
+            const updatedPro = resData.provider;
+            const idx = this.state.providers.findIndex(p => p.id === updatedPro.id);
+            if (idx !== -1) {
+              this.state.providers[idx] = updatedPro;
+            }
+          }
+        } catch (err) {
+          console.warn('API error, falling back to local simulation review submission:', err);
+          // Offline local fallback
+          booking.isReviewed = true;
+          booking.review = {
+            rating: ratingVal,
+            text: textVal,
+            date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+          };
+
+          const provider = this.state.providers.find(p => p.id === booking.providerId);
+          if (provider) {
+            provider.reviews = provider.reviews || [];
+            provider.reviews.push({
+              author: 'Abhishek K.',
+              date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+              rating: ratingVal,
+              text: textVal
+            });
+            provider.reviewsCount = provider.reviews.length;
+            const totalStars = provider.reviews.reduce((sum, r) => sum + r.rating, 0);
+            provider.rating = parseFloat((totalStars / provider.reviewsCount).toFixed(1));
+          }
+        }
+
+        // Save updated state, close modal, and re-render everything
+        this.saveState();
+        this.closeReviewModal();
+        this.showToast('Thank you! Your rating has been submitted.');
+        
+        this.renderUserBookings();
+        this.renderFeaturedProviders();
+        this.updateExploreResults();
+      });
+    }
   }
 
   // --- CHAT SYSTEM ---

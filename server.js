@@ -235,6 +235,35 @@ app.post('/api/providers/p1/rates', (req, res) => {
   res.json({ success: true, pricingList: alex.pricingList });
 });
 
+// 9. Update Provider p1 (Alex Mercer) Profile metadata
+app.post('/api/providers/p1/profile', (req, res) => {
+  const { name, phone, tagline, bio } = req.body;
+  if (!name || !phone || !tagline || !bio) {
+    return res.status(400).json({ error: 'Missing required profile fields.' });
+  }
+
+  const db = readDB();
+  const alex = db.providers.find(p => p.id === 'p1');
+  if (!alex) {
+    return res.status(404).json({ error: 'Provider Alex Mercer not found.' });
+  }
+
+  alex.name = name;
+  alex.phone = phone;
+  alex.tagline = tagline;
+  alex.bio = bio;
+
+  // Also update corresponding entries in bookings
+  db.bookings.forEach(b => {
+    if (b.providerId === 'p1') {
+      b.providerName = name;
+    }
+  });
+
+  writeDB(db);
+  res.json({ success: true, provider: alex });
+});
+
 // Start Express Server
 app.listen(PORT, () => {
   console.log(`Servify secure API server is running on http://localhost:${PORT}`);

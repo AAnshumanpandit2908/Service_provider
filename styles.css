@@ -2348,14 +2348,18 @@ a:hover {
 
 /* Auth View Layout */
 #auth-view {
+  display: none;
   min-height: calc(100vh - 4.5rem);
-  display: flex;
   align-items: center;
   justify-content: center;
   background-color: var(--bg-primary);
   position: relative;
   overflow: hidden;
   padding: 4rem 1rem;
+}
+
+#auth-view.active {
+  display: flex;
 }
 
 .auth-container {
